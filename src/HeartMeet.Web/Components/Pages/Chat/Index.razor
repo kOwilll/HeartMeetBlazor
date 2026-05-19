@@ -1,0 +1,255 @@
+@page "/chats"
+@page "/chats/{MatchId:int}"
+@attribute [Authorize]
+@inject IMatchRepository MatchRepo
+@inject IChatRepository ChatRepo
+@inject IProfileRepository ProfileRepo
+@inject AuthenticationStateProvider AuthState
+@inject IJSRuntime JS
+@implements IDisposable
+
+<PageTitle>Чаты — HeartMeet</PageTitle>
+
+<div style="display:grid;grid-template-columns:340px 1fr;height:100vh;background:#0d0a10">
+
+    <!-- Sidebar -->
+    <div style="border-right:1px solid rgba(212,90,138,.1);display:flex;flex-direction:column;background:#0e0b12;overflow:hidden">
+        <div style="padding:1.5rem 1.5rem 1rem;border-bottom:1px solid rgba(212,90,138,.08);flex-shrink:0">
+            <div style="display:flex;align-items:center;gap:.65rem;margin-bottom:.5rem">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#e87aaa" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span style="font-family:'Playfair Display',serif;font-size:1.6rem;font-weight:700;color:#f0e8f5">Сообщения</span>
+            </div>
+            <div style="font-size:.82rem;color:#7a6080">@_matches.Count совпадений</div>
+        </div>
+
+        <div style="flex:1;overflow-y:auto">
+            @if (!_matches.Any())
+            {
+                <div style="padding:3rem 1.5rem;text-align:center;display:flex;flex-direction:column;align-items:center;gap:.85rem">
+                    <div style="width:64px;height:64px;border-radius:50%;background:rgba(212,90,138,.1);border:1px solid rgba(212,90,138,.2);display:flex;align-items:center;justify-content:center">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#d45a8a" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </div>
+                    <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#c4a8d0">Нет совпадений</div>
+                    <p style="font-size:.84rem;color:#7a6080;line-height:1.5">Поставьте лайки — при взаимной симпатии откроется чат</p>
+                    <a href="/feed" style="display:inline-flex;align-items:center;gap:.5rem;padding:.55rem 1.1rem;background:linear-gradient(135deg,#9e3a62,#e87aaa);border-radius:999px;color:#fff;text-decoration:none;font-size:.85rem">Перейти в ленту</a>
+                </div>
+            }
+            @foreach (var m in _matches)
+            {
+                var other    = GetOther(m);
+                var lastMsg  = m.Chat?.Messages.FirstOrDefault();
+                var mid      = m.Id;
+                var chatId   = m.Chat?.Id ?? 0;
+                var otherId  = GetOtherId(m);
+                var av       = _avatars.GetValueOrDefault(otherId);
+                var isActive = MatchId == mid;
+                <div onclick="selectChat(@mid, @chatId, '@otherId')"
+                     style="@($"display:flex;align-items:center;gap:.85rem;padding:1rem 1.25rem;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.03);border-left:3px solid {(isActive?"#d45a8a":"transparent")};background:{(isActive?"rgba(212,90,138,.1)":"transparent")};transition:background .15s")">
+                    @if (av != null)
+                    {
+                        <img src="@av.Url" style="width:50px;height:50px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(212,90,138,.3)"
+                             onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+                        <div style="display:none;width:50px;height:50px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#9e3a62,#7c4dba);align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:#fff;border:2px solid rgba(212,90,138,.3)">@(other?.FirstName.FirstOrDefault())</div>
+                    }
+                    else
+                    {
+                        <div style="width:50px;height:50px;border-radius:50%;flex-shrink:0;background:linear-gradient(135deg,#9e3a62,#7c4dba);display:flex;align-items:center;justify-content:center;font-size:1.2rem;font-weight:700;color:#fff;border:2px solid rgba(212,90,138,.3)">@(other?.FirstName.FirstOrDefault() ?? '?')</div>
+                    }
+                    <div style="flex:1;min-width:0">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem">
+                            <span style="font-size:.95rem;font-weight:600;color:#f0e8f5;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">@(other?.FirstName ?? "?")</span>
+                            <span style="font-size:.7rem;color:#4a3855;flex-shrink:0;margin-left:.5rem">@(lastMsg?.CreatedAt.ToLocalTime().ToString("HH:mm") ?? "")</span>
+                        </div>
+                        <div style="font-size:.82rem;color:#7a6080;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+                            @(lastMsg != null ? (lastMsg.SenderId == _userId ? "Вы: " + lastMsg.Text : lastMsg.Text) : "Начните общение ✨")
+                        </div>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+
+    <!-- Chat area -->
+    <div style="display:flex;flex-direction:column;background:#0d0a10;overflow:hidden">
+        @if (_activeMatch == null)
+        {
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.25rem;text-align:center;padding:2rem">
+                <div style="width:80px;height:80px;border-radius:50%;background:rgba(212,90,138,.08);border:1px solid rgba(212,90,138,.15);display:flex;align-items:center;justify-content:center">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#d45a8a" stroke-width="1.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <div style="font-family:'Playfair Display',serif;font-size:1.6rem;color:#c4a8d0">Выберите диалог</div>
+            </div>
+        }
+        else
+        {
+            var other   = GetOther(_activeMatch);
+            var otherId = GetOtherId(_activeMatch);
+            var av      = _avatars.GetValueOrDefault(otherId);
+            var chatId  = _activeMatch.Chat?.Id ?? 0;
+            var recip   = otherId;
+            var mid     = _activeMatch.Id;
+
+            <!-- Header -->
+            <div style="padding:.9rem 1.5rem;border-bottom:1px solid rgba(212,90,138,.08);display:flex;align-items:center;gap:.9rem;flex-shrink:0;background:#0e0b12">
+                @if (av != null)
+                {
+                    <img src="@av.Url" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid rgba(212,90,138,.3)"
+                         onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+                    <div style="display:none;width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#9e3a62,#7c4dba);align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;border:2px solid rgba(212,90,138,.3)">@(other?.FirstName.FirstOrDefault())</div>
+                }
+                else
+                {
+                    <div style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#9e3a62,#7c4dba);display:flex;align-items:center;justify-content:center;font-size:1.1rem;font-weight:700;color:#fff;border:2px solid rgba(212,90,138,.3)">@(other?.FirstName.FirstOrDefault() ?? '?')</div>
+                }
+                <div style="flex:1">
+                    <div style="font-size:1.1rem;font-weight:700;color:#f0e8f5">@(other?.FirstName ?? "...")</div>
+                    @if (!string.IsNullOrEmpty(other?.City))
+                    { <div style="font-size:.78rem;color:#7a6080">📍 @other.City</div> }
+                </div>
+                <a href="/profile/@otherId" style="display:inline-flex;align-items:center;gap:.4rem;padding:.5rem 1rem;background:transparent;border:1px solid rgba(212,90,138,.25);border-radius:10px;color:#e87aaa;text-decoration:none;font-size:.84rem">
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Анкета
+                </a>
+            </div>
+
+            <!-- Messages -->
+            <div id="msgScroll" style="flex:1;overflow-y:auto;padding:1.25rem;display:flex;flex-direction:column;gap:.65rem">
+                @if (!_messages.Any())
+                {
+                    <div style="flex:1;display:flex;align-items:center;justify-content:center;text-align:center;padding:3rem">
+                        <p style="color:#7a6080;font-size:.95rem">Напишите первое сообщение @(other?.FirstName ?? "") 👋</p>
+                    </div>
+                }
+                @foreach (var msg in _messages)
+                {
+                    var mine = msg.SenderId == _userId;
+                    <div style="@($"display:flex;flex-direction:column;max-width:65%;{(mine?"align-self:flex-end;align-items:flex-end":"align-self:flex-start;align-items:flex-start")}")">
+                        <div style="@($"padding:.65rem 1rem;border-radius:{(mine?"18px 18px 4px 18px":"18px 18px 18px 4px")};font-size:.93rem;line-height:1.5;word-break:break-word;{(mine?"background:linear-gradient(135deg,#9e3a62,#d45a8a);color:#fff":"background:#1e1628;border:1px solid rgba(212,90,138,.12);color:#c4a8d0")}")">
+                            @msg.Text
+                        </div>
+                        <div style="font-size:.66rem;color:#4a3855;margin-top:.2rem;padding:0 .25rem">@msg.CreatedAt.ToLocalTime().ToString("HH:mm")</div>
+                    </div>
+                }
+            </div>
+
+            <!-- Input — pure JS send -->
+            <div style="padding:.9rem 1.25rem;border-top:1px solid rgba(212,90,138,.08);display:flex;gap:.65rem;align-items:flex-end;background:#0e0b12;flex-shrink:0">
+                <textarea id="msgInput" placeholder="Написать сообщение..."
+                          onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMsg(@chatId,@mid,'@recip')}"
+                          style="flex:1;background:#1a1420;border:1px solid rgba(212,90,138,.2);border-radius:14px;padding:.75rem 1rem;font-family:'Inter',sans-serif;font-size:.93rem;color:#f0e8f5;outline:none;resize:none;max-height:120px;line-height:1.5;transition:border-color .2s"
+                          onfocus="this.style.borderColor='rgba(212,90,138,.5)'" onblur="this.style.borderColor='rgba(212,90,138,.2)'"></textarea>
+                <button onclick="sendMsg(@chatId,@mid,'@recip')"
+                        style="width:44px;height:44px;border-radius:50%;background:linear-gradient(135deg,#9e3a62,#d45a8a);border:none;color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;box-shadow:0 4px 16px rgba(212,90,138,.4)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                </button>
+            </div>
+        }
+    </div>
+</div>
+
+<script>
+function sendMsg(chatId, matchId, recipientId) {
+    var input = document.getElementById('msgInput');
+    var text  = input ? input.value.trim() : '';
+    if (!text) return;
+    input.value = '';
+    input.style.height = 'auto';
+
+    fetch('/api/chat/send', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: chatId, matchId: matchId, text: text, recipientId: recipientId })
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(msg) {
+        appendMessage(msg.text, true, msg.createdAt);
+    })
+    .catch(function(e) { console.error('Send failed:', e); });
+}
+
+function appendMessage(text, mine, time) {
+    var scroll = document.getElementById('msgScroll');
+    if (!scroll) return;
+    var div = document.createElement('div');
+    div.style.cssText = 'display:flex;flex-direction:column;max-width:65%;' + (mine ? 'align-self:flex-end;align-items:flex-end' : 'align-self:flex-start;align-items:flex-start');
+    var bubble = mine
+        ? 'padding:.65rem 1rem;border-radius:18px 18px 4px 18px;font-size:.93rem;line-height:1.5;word-break:break-word;background:linear-gradient(135deg,#9e3a62,#d45a8a);color:#fff'
+        : 'padding:.65rem 1rem;border-radius:18px 18px 18px 4px;font-size:.93rem;line-height:1.5;word-break:break-word;background:#1e1628;border:1px solid rgba(212,90,138,.12);color:#c4a8d0';
+    div.innerHTML = '<div style="' + bubble + '">' + text + '</div><div style="font-size:.66rem;color:#4a3855;margin-top:.2rem;padding:0 .25rem">' + time + '</div>';
+    scroll.appendChild(div);
+    scroll.scrollTop = scroll.scrollHeight;
+}
+
+function selectChat(matchId, chatId, otherId) {
+    window.location.href = '/chats/' + matchId;
+}
+</script>
+
+@code {
+    [Parameter] public int? MatchId { get; set; }
+
+    List<Match>                          _matches  = new();
+    Match?                               _activeMatch;
+    List<Message>                        _messages = new();
+    Dictionary<string, ApplicationUser?> _users    = new();
+    Dictionary<string, Photo?>           _avatars  = new();
+    string _userId = "";
+    bool   _needsScroll;
+    Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth  = await AuthState.GetAuthenticationStateAsync();
+        _userId   = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        _matches  = await MatchRepo.GetUserMatchesAsync(_userId);
+
+        foreach (var m in _matches)
+        {
+            var oid = GetOtherId(m);
+            if (!_users.ContainsKey(oid))
+            {
+                _users[oid]   = await ProfileRepo.GetByIdAsync(oid);
+                _avatars[oid] = await ProfileRepo.GetAvatarAsync(oid);
+            }
+        }
+
+        if (MatchId.HasValue)
+            _activeMatch = _matches.FirstOrDefault(m => m.Id == MatchId.Value);
+        else if (_matches.Any())
+            _activeMatch = _matches.First();
+
+        if (_activeMatch?.Chat != null)
+        {
+            _messages = await ChatRepo.GetMessagesAsync(_activeMatch.Chat.Id);
+            await ChatRepo.MarkReadAsync(_activeMatch.Chat.Id, _userId);
+            _needsScroll = true;
+        }
+
+        // Poll for new messages every 3s
+        _timer = new Timer(async _ => await InvokeAsync(async () =>
+        {
+            if (_activeMatch?.Chat == null) return;
+            var msgs = await ChatRepo.GetMessagesAsync(_activeMatch.Chat.Id);
+            if (msgs.Count != _messages.Count)
+            {
+                _messages    = msgs;
+                _needsScroll = true;
+                StateHasChanged();
+            }
+        }), null, 3000, 3000);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool first)
+    {
+        if (_needsScroll)
+        {
+            _needsScroll = false;
+            await JS.InvokeVoidAsync("scrollToBottom", "msgScroll");
+        }
+    }
+
+    string GetOtherId(Match m) => m.User1Id == _userId ? m.User2Id : m.User1Id;
+    ApplicationUser? GetOther(Match m) => _users.GetValueOrDefault(GetOtherId(m));
+    public void Dispose() => _timer?.Dispose();
+}

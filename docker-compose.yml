@@ -1,0 +1,35 @@
+version: '3.9'
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER:     heartmeet
+      POSTGRES_PASSWORD: heartmeet_pass
+      POSTGRES_DB:       heartmeet_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U heartmeet -d heartmeet_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ConnectionStrings__Default: "Host=db;Port=5432;Database=heartmeet_db;Username=heartmeet;Password=heartmeet_pass"
+      ASPNETCORE_ENVIRONMENT: Production
+      ASPNETCORE_URLS: http://+:8080
+    ports:
+      - "5001:8080"
+    volumes:
+      - uploads_data:/app/wwwroot/uploads
+
+volumes:
+  postgres_data:
+  uploads_data:

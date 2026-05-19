@@ -1,0 +1,18 @@
+@page "/profile"
+@attribute [Authorize]
+@inject IProfileRepository ProfileRepo
+@inject ILikeRepository LikeRepo
+@inject IMatchRepository MatchRepo
+@inject AuthenticationStateProvider AuthState
+@inject NavigationManager Nav
+
+<PageTitle>Мой профиль — HeartMeet</PageTitle>
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var uid  = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        Nav.NavigateTo("/profile/" + uid, replace: true);
+    }
+}

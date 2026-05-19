@@ -1,0 +1,303 @@
+@page "/profile/edit"
+@attribute [Authorize]
+@inject IProfileRepository ProfileRepo
+@inject AuthenticationStateProvider AuthState
+@inject Microsoft.AspNetCore.Identity.UserManager<ApplicationUser> UserManager
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<PageTitle>Редактировать профиль — HeartMeet</PageTitle>
+
+<div style="min-height:100vh;background:#0d0a10;display:flex;flex-direction:column;justify-content:center;padding:3rem 2rem">
+<div style="max-width:1060px;margin:0 auto;width:100%">
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem;flex-wrap:wrap;gap:1rem">
+        <h1 style="font-family:'Playfair Display',serif;font-size:3rem;font-weight:700;color:#f0e8f5;display:flex;align-items:center;gap:.75rem">
+            <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#e87aaa" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            Редактирование анкеты
+        </h1>
+        <a href="/profile/@_userId" style="display:inline-flex;align-items:center;gap:.5rem;padding:.6rem 1.25rem;background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:12px;color:#7a6080;text-decoration:none;font-size:.9rem">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+            К профилю
+        </a>
+    </div>
+
+    @if (!string.IsNullOrEmpty(_photoErr))
+    {
+        <div style="background:rgba(224,90,106,.1);border:1px solid rgba(224,90,106,.25);border-radius:14px;padding:.9rem 1.25rem;color:#e05a6a;margin-bottom:1.5rem;display:flex;align-items:center;gap:.6rem">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+            @_photoErr
+        </div>
+    }
+
+    <div style="display:grid;grid-template-columns:320px 1fr;gap:2rem;align-items:start">
+
+        <!-- PHOTOS CARD -->
+        <div style="background:#1a1420;border:1px solid rgba(212,90,138,.12);border-radius:24px;padding:1.5rem">
+            <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1.25rem;justify-content:center">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e87aaa" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                <span style="font-size:.85rem;font-weight:600;color:#c4a8d0;text-transform:uppercase;letter-spacing:.08em">Фотографии</span>
+            </div>
+
+            <!-- Existing photos grid -->
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.75rem">
+                @foreach (var photo in _photos)
+                {
+                    var pid = photo.Id;
+                    <div data-photo="@photo.Id" style="aspect-ratio:1;border-radius:12px;overflow:hidden;position:relative;background:#211829;width:100%">
+                        <img src="@photo.Url" style="width:100%;height:100%;object-fit:cover" alt="" />
+                        @if (photo.IsAvatar)
+                        { <div style="position:absolute;top:.3rem;left:.3rem;background:#d45a8a;color:#fff;font-size:.58rem;padding:.1rem .45rem;border-radius:999px;font-weight:600">Главное</div> }
+                        <button onclick="deletePhoto(@photo.Id, this)"
+                                style="position:absolute;top:.3rem;right:.3rem;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.75);border:1px solid rgba(255,255,255,.15);color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:10">
+                            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                    </div>
+                }
+            </div>
+
+            <!-- Upload button — plain HTML form, always works -->
+            @if (_photos.Count < 4)
+            {
+                <div style="border:2px dashed rgba(212,90,138,.3);border-radius:12px;padding:1.25rem;text-align:center;cursor:pointer;transition:border-color .2s,background .2s"
+                     id="uploadZone"
+                     onmouseover="this.style.borderColor='rgba(212,90,138,.6)';this.style.background='rgba(212,90,138,.06)'"
+                     onmouseout="this.style.borderColor='rgba(212,90,138,.3)';this.style.background='transparent'"
+                     onclick="document.getElementById('realFileInput').click()">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#d45a8a" stroke-width="1.5" style="margin:0 auto .5rem"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <div style="font-size:.85rem;color:#c4a8d0;font-weight:500">Добавить фото</div>
+                    <div style="font-size:.72rem;color:#4a3855;margin-top:.25rem">JPG, PNG, WebP · до 10 МБ</div>
+                </div>
+
+                <!-- This input is a real native HTML input, NOT Blazor InputFile -->
+                <input type="file" id="realFileInput" accept="image/jpeg,image/png,image/webp,image/gif"
+                       style="display:none"
+                       onchange="uploadPhoto(this)" />
+            }
+
+            @if (!string.IsNullOrEmpty(_photoErr))
+            { <div style="font-size:.78rem;color:#e05a6a;margin-top:.5rem;text-align:center">@_photoErr</div> }
+        </div>
+
+        <!-- FIELDS CARD -->
+        <div style="background:#1a1420;border:1px solid rgba(212,90,138,.12);border-radius:24px;padding:1.75rem;display:flex;flex-direction:column;gap:1.25rem">
+
+            <div style="display:flex;align-items:center;gap:.6rem">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#e87aaa" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                <span style="font-size:.85rem;font-weight:600;color:#c4a8d0;text-transform:uppercase;letter-spacing:.08em">Основная информация</span>
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div>
+                    <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Имя</label>
+                    <input class="input" id="f_firstName" @bind="_firstName" placeholder="Ваше имя" style="font-size:1rem;padding:.75rem 1rem" />
+                </div>
+                <div>
+                    <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Возраст</label>
+                    <input class="input" id="f_age" type="number" min="18" max="80" @bind="_age" style="font-size:1rem;padding:.75rem 1rem" />
+                </div>
+            </div>
+
+            <div>
+                <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Город</label>
+                <input class="input" id="f_city" @bind="_city" placeholder="Москва" style="font-size:1rem;padding:.75rem 1rem" />
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+                <div>
+                    <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Я</label>
+                    <select class="select" id="f_gender" @bind="_gender" style="font-size:1rem;padding:.75rem 1rem">
+                        <option value="Male">Мужской</option>
+                        <option value="Female">Женский</option>
+                        <option value="Other">Другой</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Ищу</label>
+                    <select class="select" id="f_lookingFor" @bind="_lookingFor" style="font-size:1rem;padding:.75rem 1rem">
+                        <option value="Male">Мужчину</option>
+                        <option value="Female">Женщину</option>
+                        <option value="Any">Неважно</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.4rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">О себе (до 500 символов)</label>
+                <textarea class="textarea" id="f_bio" rows="4" maxlength="500" @bind="_bio" placeholder="Расскажите о себе..." style="font-size:1rem;padding:.75rem 1rem"></textarea>
+            </div>
+
+            <div>
+                <label style="display:block;font-size:.78rem;color:#7a6080;margin-bottom:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:.06em">Интересы</label>
+                <div style="display:flex;flex-wrap:wrap;gap:.5rem">
+                    @foreach (var interest in _allInterests)
+                    {
+                        var iid = interest.Id;
+                        bool sel = _selInterests.Contains(iid);
+                        <button type="button"
+                                data-interest-id="@iid"
+                                data-selected="@(sel?"1":"0")"
+                                onclick="toggleInterest(this)"
+                                style="@($"display:inline-flex;align-items:center;gap:.4rem;padding:.4rem 1rem;border-radius:999px;font-size:.88rem;cursor:pointer;transition:all .15s;border:1px solid;background:transparent;{(sel ? "border-color:rgba(212,90,138,.5);color:#e87aaa;background:rgba(212,90,138,.12)" : "border-color:rgba(255,255,255,.08);color:#7a6080")}")">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="@(sel?"currentColor":"none")" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                            @interest.Name
+                        </button>
+                    }
+                </div>
+            </div>
+
+            <button id="saveBtn" onclick="saveProfile()"
+                    style="display:flex;align-items:center;justify-content:center;gap:.6rem;padding:1rem;background:linear-gradient(135deg,#9e3a62,#e87aaa);border:none;border-radius:14px;color:#fff;font-size:1rem;font-weight:600;cursor:pointer;margin-top:.25rem;transition:all .3s;width:100%">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                <span id="saveTxt">Сохранить изменения</span>
+            </button>
+        </div>
+    </div>
+</div>
+</div>
+
+<script>
+function toggleInterest(btn) {
+    var sel = btn.getAttribute('data-selected') === '1';
+    btn.setAttribute('data-selected', sel ? '0' : '1');
+    if (!sel) {
+        btn.style.borderColor = 'rgba(212,90,138,.5)';
+        btn.style.color = '#e87aaa';
+        btn.style.background = 'rgba(212,90,138,.12)';
+    } else {
+        btn.style.borderColor = 'rgba(255,255,255,.08)';
+        btn.style.color = '#7a6080';
+        btn.style.background = 'transparent';
+    }
+}
+
+function saveProfile() {
+    var btn  = document.getElementById('saveBtn');
+    var txt  = document.getElementById('saveTxt');
+    var err  = document.getElementById('saveErr');
+    btn.disabled = true;
+    btn.style.opacity = '0.7';
+    txt.textContent = 'Сохраняем...';
+
+    // Collect interests
+    var interests = [];
+    document.querySelectorAll('[data-interest-id]').forEach(function(el) {
+        if (el.getAttribute('data-selected') === '1')
+            interests.push(parseInt(el.getAttribute('data-interest-id')));
+    });
+
+    var payload = {
+        firstName:  document.getElementById('f_firstName')?.value || '',
+        age:        parseInt(document.getElementById('f_age')?.value) || 18,
+        city:       document.getElementById('f_city')?.value || '',
+        bio:        document.getElementById('f_bio')?.value || '',
+        gender:     document.getElementById('f_gender')?.value || 'Male',
+        lookingFor: document.getElementById('f_lookingFor')?.value || 'Any',
+        interests:  interests
+    };
+
+    fetch('/api/profile/save', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false; btn.style.opacity = '1';
+        if (data.error) {
+            txt.textContent = 'Ошибка: ' + data.error;
+            btn.style.background = 'linear-gradient(135deg,#7a1a2a,#e05a6a)';
+        } else {
+            btn.style.background = 'linear-gradient(135deg,#2d7a4f,#4caf82)';
+            txt.textContent = '✓ Сохранено!';
+            setTimeout(function() {
+                btn.style.background = 'linear-gradient(135deg,#9e3a62,#e87aaa)';
+                txt.textContent = 'Сохранить изменения';
+            }, 3000);
+        }
+    })
+    .catch(function(e) {
+        btn.disabled = false; btn.style.opacity = '1';
+        txt.textContent = 'Ошибка сети';
+        btn.style.background = 'linear-gradient(135deg,#7a1a2a,#e05a6a)';
+    });
+}
+
+function deletePhoto(photoId, btn) {
+    btn.disabled = true;
+    btn.style.opacity = '0.4';
+    fetch('/api/photo/' + photoId, { method:'DELETE', credentials:'include' })
+        .then(function(r) {
+            if (r.ok) {
+                // Remove the parent photo div from DOM immediately
+                var photoDiv = btn.closest('[data-photo]');
+                if (photoDiv) photoDiv.remove();
+                else window.location.reload();
+            } else {
+                btn.disabled = false;
+                btn.style.opacity = '1';
+                alert('Ошибка удаления');
+            }
+        })
+        .catch(function() { window.location.reload(); });
+}
+
+function uploadPhoto(input) {
+    if (!input.files || !input.files[0]) return;
+    var file = input.files[0];
+    var form = new FormData();
+    form.append('file', file);
+
+    // Show spinner
+    var zone = document.getElementById('uploadZone');
+    if (zone) zone.innerHTML = '<div style="color:#e87aaa;font-size:.85rem;padding:.5rem">Загружаем...</div>';
+
+    fetch('/api/photo/upload', { method:'POST', credentials:'include', body:form })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+        if (data.error) {
+            if (zone) zone.innerHTML = '<div style="color:#e05a6a;font-size:.85rem">' + data.error + '</div>';
+        } else {
+            // Reload the page to show new photo
+            window.location.reload();
+        }
+    })
+    .catch(function(e){
+        if (zone) zone.innerHTML = '<div style="color:#e05a6a;font-size:.85rem">Ошибка: ' + e.message + '</div>';
+    });
+    input.value = '';
+}
+</script>
+
+@code {
+    string _userId = "", _firstName = "", _city = "", _bio = "";
+    string _gender = "Male", _lookingFor = "Any";
+    int    _age = 25;
+    string _photoErr = "";
+    List<Photo>    _photos       = new();
+    List<Interest> _allInterests = new();
+    HashSet<int>   _selInterests = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        _userId  = auth.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        var user = await ProfileRepo.GetByIdAsync(_userId);
+        if (user != null) { _firstName=user.FirstName; _age=user.Age; _city=user.City; _bio=user.Bio; _gender=user.Gender.ToString(); _lookingFor=user.LookingFor.ToString(); }
+        _photos       = await ProfileRepo.GetPhotosAsync(_userId);
+        _allInterests = await ProfileRepo.GetInterestsAsync();
+        _selInterests = (await ProfileRepo.GetUserInterestIdsAsync(_userId)).ToHashSet();
+    }
+
+    async Task DeletePhoto(int id)
+    {
+        await ProfileRepo.DeletePhotoAsync(id);
+        _photos = await ProfileRepo.GetPhotosAsync(_userId);
+        StateHasChanged();
+    }
+
+    void ToggleInterest(int id) { if (!_selInterests.Remove(id)) _selInterests.Add(id); }
+
+
+}

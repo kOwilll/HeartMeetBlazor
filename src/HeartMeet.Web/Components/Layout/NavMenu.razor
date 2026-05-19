@@ -1,0 +1,151 @@
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthState
+@inject INotificationRepository NotifRepo
+@inject INotificationService NotifSvc
+@implements IDisposable
+
+<nav class="navbar">
+    <a href="/feed" class="navbar__logo">♥ HeartMeet</a>
+
+    @if (_isAuth)
+    {
+        <div class="navbar__nav">
+            <a href="/feed" class="nav-link @A("/feed")">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                Анкеты
+            </a>
+            <a href="/chats" class="nav-link @A("/chats")">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                Чаты
+                @if (_unread > 0)
+                { <span style="background:var(--rose);color:#fff;border-radius:9px;font-size:.6rem;font-weight:700;padding:1px 5px">@_unread</span> }
+            </a>
+            <a href="/likes" class="nav-link @A("/likes")">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                Лайки
+            </a>
+            <a href="/profile/@_userId" class="nav-link @A("/profile")">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                Профиль
+            </a>
+            @if (_isAdmin)
+            {
+                <a href="/admin" class="nav-link @A("/admin")">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                    Админ
+                </a>
+            }
+        </div>
+
+        <div class="navbar__right" style="position:relative">
+            <button class="notif-btn @(_unread>0?"has-notif":"")" @onclick="ToggleNotif">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                @if (_unread > 0) { <span class="notif-badge">@_unread</span> }
+            </button>
+            @if (_showNotif)
+            {
+                <div style="position:fixed;inset:0;z-index:199" @onclick="()=>_showNotif=false"></div>
+                <div class="notif-panel" style="position:absolute;z-index:200">
+                    <div class="notif-panel__head">
+                        <span>Уведомления</span>
+                        @if (_notifs.Any()) { <button class="notif-panel__clear" @onclick="MarkAll">Прочитать все</button> }
+                    </div>
+                    @if (!_notifs.Any()) { <div class="notif-panel__empty">Уведомлений нет 🔔</div> }
+                    @foreach (var n in _notifs)
+                    {
+                        <div class="notif-item @(n.IsRead?"read":"")" @onclick="()=>GoNotif(n)">
+                            <div class="notif-item__icon">
+                                @if (n.Type == NotificationType.Like) { <span>♥</span> }
+                                else if (n.Type == NotificationType.Match) { <span>💕</span> }
+                                else { <span>💬</span> }
+                            </div>
+                            <div class="notif-item__body">
+                                <div class="notif-item__title">@n.Title</div>
+                                <div class="notif-item__time">@n.CreatedAt.ToLocalTime().ToString("d MMM HH:mm")</div>
+                            </div>
+                        </div>
+                    }
+                </div>
+            }
+            <div style="position:relative">
+                <button class="avatar-btn" @onclick="()=>_showDd=!_showDd">
+                    <div class="avatar-initial">@_initial</div>
+                    <span style="font-size:.82rem">@_name</span>
+                </button>
+                @if (_showDd)
+                {
+                    <div style="position:fixed;inset:0;z-index:199" @onclick="()=>_showDd=false"></div>
+                    <div class="dropdown" style="position:absolute;right:0;z-index:200">
+                        <a href="/profile/@_userId" class="dd-item" @onclick="()=>_showDd=false">👤 Мой профиль</a>
+                        <a href="/profile/edit" class="dd-item" @onclick="()=>_showDd=false">✏️ Редактировать</a>
+                        <a href="/chats" class="dd-item" @onclick="()=>_showDd=false">💬 Чаты</a>
+                        <a href="/likes" class="dd-item" @onclick="()=>_showDd=false">♥ Кто лайкнул</a>
+                        <div class="dd-sep"></div>
+                        <form action="/account/logout" method="post">
+                            <AntiforgeryToken />
+                            <button type="submit" class="dd-item" style="width:100%;border:none;background:none;color:#e05a6a;text-align:left;cursor:pointer">🚪 Выйти</button>
+                        </form>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+</nav>
+
+@code {
+    bool   _isAuth, _isAdmin, _showNotif, _showDd;
+    string _userId = "", _name = "", _initial = "?";
+    int    _unread;
+    List<Notification> _notifs = new();
+    Timer? _timer;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await AuthState.GetAuthenticationStateAsync();
+        var user = auth.User;
+        _isAuth  = user.Identity?.IsAuthenticated ?? false;
+        _isAdmin = user.IsInRole("Admin");
+        _userId  = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value ?? "";
+        _name    = user.FindFirst(System.Security.Claims.ClaimTypes.GivenName)?.Value ?? "";
+        _initial = _name.Length > 0 ? char.ToUpper(_name[0]).ToString() : "?";
+        NotifSvc.OnChange += OnNotifChanged;
+        if (_isAuth)
+        {
+            await LoadNotifs();
+            _timer = new Timer(async _ => await InvokeAsync(async () =>
+            { await LoadNotifs(); StateHasChanged(); }), null, 8000, 8000);
+        }
+    }
+
+    async Task LoadNotifs()
+    {
+        if (string.IsNullOrEmpty(_userId)) return;
+        _notifs = await NotifRepo.GetForUserAsync(_userId, 15);
+        _unread = _notifs.Count(n => !n.IsRead);
+    }
+
+    void OnNotifChanged() => InvokeAsync(async () => { await LoadNotifs(); StateHasChanged(); });
+
+    async Task ToggleNotif()
+    {
+        _showNotif = !_showNotif;
+        if (_showNotif && _unread > 0)
+        {
+            await NotifRepo.MarkAllReadAsync(_userId);
+            _unread = 0;
+            foreach (var n in _notifs) n.IsRead = true;
+        }
+    }
+
+    async Task MarkAll() { await NotifRepo.MarkAllReadAsync(_userId); _unread = 0; foreach (var n in _notifs) n.IsRead = true; }
+
+    async Task GoNotif(Notification n)
+    {
+        _showNotif = false;
+        await NotifRepo.MarkReadAsync(n.Id);
+        if (!string.IsNullOrEmpty(n.LinkUrl)) Nav.NavigateTo(n.LinkUrl);
+    }
+
+    string A(string path) => Nav.Uri.Contains(path, StringComparison.OrdinalIgnoreCase) ? "active" : "";
+    public void Dispose() { _timer?.Dispose(); NotifSvc.OnChange -= OnNotifChanged; }
+}

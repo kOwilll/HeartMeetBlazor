@@ -1,0 +1,11 @@
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\bin\Debug\net8.0\HeartMeet.Domain.deps.json
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\bin\Debug\net8.0\HeartMeet.Domain.dll
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\bin\Debug\net8.0\HeartMeet.Domain.pdb
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\HeartMeet.Domain.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\HeartMeet.Domain.AssemblyInfoInputs.cache
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\HeartMeet.Domain.AssemblyInfo.cs
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\HeartMeet.Domain.csproj.CoreCompileInputs.cache
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\HeartMeet.Domain.dll
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\refint\HeartMeet.Domain.dll
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\HeartMeet.Domain.pdb
+C:\Users\HomePC\Desktop\HeartMeet\src\HeartMeet.Domain\obj\Debug\net8.0\ref\HeartMeet.Domain.dll
