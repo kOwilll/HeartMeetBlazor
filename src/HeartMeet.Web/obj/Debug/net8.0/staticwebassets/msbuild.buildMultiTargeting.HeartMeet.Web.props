@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\HeartMeet.Web.props" />
-</Project>
