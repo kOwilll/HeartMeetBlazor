@@ -3,21 +3,23 @@ services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
+    container_name: heart_meet_db
     environment:
-      POSTGRES_USER:     heartmeet
+      POSTGRES_USER: heartmeet
       POSTGRES_PASSWORD: heartmeet_pass
-      POSTGRES_DB:       heartmeet_db
+      POSTGRES_DB: heartmeet_db
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL","pg_isready -U heartmeet -d heartmeet_db"]
+      test: [ "CMD-SHELL", "pg_isready -U heartmeet -d heartmeet_db" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
   app:
-    build: .
+    image: kowilll/heartmeet_image
     restart: unless-stopped
+    container_name: heart_meet_app
     depends_on:
       db:
         condition: service_healthy
@@ -26,7 +28,7 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ASPNETCORE_URLS: http://+:8080
     ports:
-      - "5001:8080"
+      - "8028:8080"
     volumes:
       - uploads_data:/app/wwwroot/uploads
 

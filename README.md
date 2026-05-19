@@ -23,7 +23,7 @@ dotnet run
 docker-compose up -d --build
 ```
 
-Открыть: **http://localhost:5001**
+Открыть: **http://localhost:8028**
 
 ## Тест-аккаунты
 
